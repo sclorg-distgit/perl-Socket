@@ -2,7 +2,7 @@
 
 Name:           %{?scl_prefix}perl-Socket
 Epoch:          4
-Version:        2.023
+Version:        2.024
 Release:        1%{?dist}
 Summary:        Networking constants and support functions
 License:        GPL+ or Artistic
@@ -67,6 +67,9 @@ find $RPM_BUILD_ROOT -type f -name '*.bs' -size 0 -exec rm -f {} \;
 %{_mandir}/man3/*
 
 %changelog
+* Fri Aug 12 2016 Jitka Plesnikova <jplesnik@redhat.com> - 4:2.024-1
+- 2.024 bump
+
 * Thu Aug 04 2016 Jitka Plesnikova <jplesnik@redhat.com> - 4:2.023-1
 - 2.023 bump
 
