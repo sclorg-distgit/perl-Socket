@@ -1,0 +1,66 @@
+From 0be99f8799e90eaed4e8eeb7d5be7de81dd71360 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Petr=20P=C3=ADsa=C5=99?= <ppisar@redhat.com>
+Date: Thu, 11 Apr 2019 18:17:16 +0200
+Subject: [PATCH] inet_aton: Use getaddrinfo() if possible
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Socket::inet_aton() used gethostbyname() to process arguments that are
+not an IP addres. However, gethostbyname() is not thread-safe and when
+called from multiple threads a bogus value can be returned.
+
+This patch does add any new test because a basic inet_aton() usage is
+already covered and because reproducing the thread failure would
+require flodding DNS servers with thousounds of request.
+
+<https://rt.perl.org/Public/Bug/Display.html?id=97860>
+<https://bugzilla.redhat.com/show_bug.cgi?id=1693293>
+
+Signed-off-by: Petr Písař <ppisar@redhat.com>
+---
+ Socket.xs | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/Socket.xs b/Socket.xs
+index e46c93e..65244dd 100644
+--- a/Socket.xs
++++ b/Socket.xs
+@@ -764,19 +764,33 @@ inet_aton(host)
+ 	char *	host
+ 	CODE:
+ 	{
++#ifdef HAS_GETADDRINFO
++	struct addrinfo *res;
++	struct addrinfo hints = {0,};
++	hints.ai_family = AF_INET;
++	if (!getaddrinfo(host, NULL, &hints, &res)) {
++	    ST(0) = sv_2mortal(newSVpvn(
++		(char *)&(((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr),
++		4
++	));
++	freeaddrinfo(res);
++	XSRETURN(1);
++    }
++#else
+ 	struct in_addr ip_address;
+ 	struct hostent * phe;
+-
+ 	if ((*host != '\0') && inet_aton(host, &ip_address)) {
+ 		ST(0) = sv_2mortal(newSVpvn((char *)&ip_address, sizeof(ip_address)));
+ 		XSRETURN(1);
+ 	}
+ #ifdef HAS_GETHOSTBYNAME
++	/* gethostbyname is not thread-safe */
+ 	phe = gethostbyname(host);
+ 	if (phe && phe->h_addrtype == AF_INET && phe->h_length == 4) {
+ 		ST(0) = sv_2mortal(newSVpvn((char *)phe->h_addr, phe->h_length));
+ 		XSRETURN(1);
+ 	}
++#endif
+ #endif
+ 	XSRETURN_UNDEF;
+ 	}
+-- 
+2.20.1
+
